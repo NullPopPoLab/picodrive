@@ -1401,17 +1401,17 @@ void retro_reset(void)
 
 static const unsigned short retro_pico_map[] = {
    [RETRO_DEVICE_ID_JOYPAD_B]      = 1 << GBTN_B,
-   [RETRO_DEVICE_ID_JOYPAD_Y]      = 1 << GBTN_A,
-   [RETRO_DEVICE_ID_JOYPAD_SELECT] = 1 << GBTN_MODE,
+   [RETRO_DEVICE_ID_JOYPAD_A]      = 1 << GBTN_A,
+   [RETRO_DEVICE_ID_JOYPAD_R1]     = 1 << GBTN_MODE,
    [RETRO_DEVICE_ID_JOYPAD_START]  = 1 << GBTN_START,
    [RETRO_DEVICE_ID_JOYPAD_UP]     = 1 << GBTN_UP,
    [RETRO_DEVICE_ID_JOYPAD_DOWN]   = 1 << GBTN_DOWN,
    [RETRO_DEVICE_ID_JOYPAD_LEFT]   = 1 << GBTN_LEFT,
    [RETRO_DEVICE_ID_JOYPAD_RIGHT]  = 1 << GBTN_RIGHT,
-   [RETRO_DEVICE_ID_JOYPAD_A]      = 1 << GBTN_C,
-   [RETRO_DEVICE_ID_JOYPAD_X]      = 1 << GBTN_Y,
-   [RETRO_DEVICE_ID_JOYPAD_L]      = 1 << GBTN_X,
-   [RETRO_DEVICE_ID_JOYPAD_R]      = 1 << GBTN_Z,
+   [RETRO_DEVICE_ID_JOYPAD_C]      = 1 << GBTN_C,
+   [RETRO_DEVICE_ID_JOYPAD_Y]      = 1 << GBTN_Y,
+   [RETRO_DEVICE_ID_JOYPAD_X]      = 1 << GBTN_X,
+   [RETRO_DEVICE_ID_JOYPAD_Z]      = 1 << GBTN_Z,
 };
 #define RETRO_PICO_MAP_LEN (sizeof(retro_pico_map) / sizeof(retro_pico_map[0]))
 
