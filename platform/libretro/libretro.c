@@ -1689,7 +1689,7 @@ void retro_run(void)
    bool updated = false;
    int pad, i;
    static void *buff;
-   int16_t input;
+   int32_t input;
 
    PicoIn.skipFrame = 0;
 
