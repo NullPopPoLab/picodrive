@@ -1710,6 +1710,7 @@ void retro_run(void)
             if (input_state_cb(pad, RETRO_DEVICE_JOYPAD, 0, i))
                PicoIn.pad[pad] |= retro_pico_map[i];
       }
+if(PicoIn.pad[pad])printf("input[%d]=%08X\n",pad,PicoIn.pad[pad]);
    }
 
    if (PicoPatches)
