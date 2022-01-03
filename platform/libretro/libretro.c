@@ -1714,13 +1714,16 @@ asgn|=1<<retro_pico_map[i].retro;
                PicoIn.pad[pad] |= retro_pico_map[i].pico;
 		}
       } else {
+input=0;
          for (i = 0; i < RETRO_PICO_MAP_LEN; i++){
 asgn|=1<<retro_pico_map[i].retro;
-            if (input_state_cb(pad, RETRO_DEVICE_JOYPAD, 0, retro_pico_map[i].retro))
+            if (input_state_cb(pad, RETRO_DEVICE_JOYPAD, 0, retro_pico_map[i].retro)){
+input|=1<<retro_pico_map[i].retro;
                PicoIn.pad[pad] |= retro_pico_map[i].pico;
+}
 		}
       }
-if(log_cb&&PicoIn.pad[pad])log_cb(RETRO_LOG_INFO,"input[%d]=%08X/%08X bm=%s\n",pad,PicoIn.pad[pad],asgn,libretro_supports_bitmasks?"yes":"no");
+if(log_cb&&input)log_cb(RETRO_LOG_INFO,"input[%d]=%08X/%08X/%08X bm=%s\n",pad,input,PicoIn.pad[pad],asgn,libretro_supports_bitmasks?"yes":"no");
    }
 
    if (PicoPatches)
