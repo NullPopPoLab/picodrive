@@ -1720,7 +1720,7 @@ asgn|=1<<retro_pico_map[i].retro;
                PicoIn.pad[pad] |= retro_pico_map[i].pico;
 		}
       }
-if(PicoIn.pad[pad])printf("input[%d]=%08X/%08X bm=%s\n",pad,PicoIn.pad[pad],asgn,libretro_supports_bitmasks?"yes":"no");
+if(log_cb&&PicoIn.pad[pad])log_cb(RETRO_LOG_INFO,"input[%d]=%08X/%08X bm=%s\n",pad,PicoIn.pad[pad],asgn,libretro_supports_bitmasks?"yes":"no");
    }
 
    if (PicoPatches)
