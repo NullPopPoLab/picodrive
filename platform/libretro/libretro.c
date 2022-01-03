@@ -1694,7 +1694,7 @@ void retro_run(void)
    bool updated = false;
    int pad, i;
    static void *buff;
-   int32_t input;
+   int32_t input,asgn;
 
    PicoIn.skipFrame = 0;
 
@@ -1703,19 +1703,24 @@ void retro_run(void)
 
    input_poll_cb();
 
+asgn=0;
    PicoIn.pad[0] = PicoIn.pad[1] = 0;
    for (pad = 0; pad < 2; pad++) {
       if (libretro_supports_bitmasks) {
          input = input_state_cb(pad, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_MASK);
-         for (i = 0; i < RETRO_PICO_MAP_LEN; i++)
+         for (i = 0; i < RETRO_PICO_MAP_LEN; i++){
+asgn|=1<<retro_pico_map[i].retro;
             if (input & (1<<retro_pico_map[i].retro))
                PicoIn.pad[pad] |= retro_pico_map[i].pico;
+		}
       } else {
-         for (i = 0; i < RETRO_PICO_MAP_LEN; i++)
+         for (i = 0; i < RETRO_PICO_MAP_LEN; i++){
+asgn|=1<<retro_pico_map[i].retro;
             if (input_state_cb(pad, RETRO_DEVICE_JOYPAD, 0, retro_pico_map[i].retro))
                PicoIn.pad[pad] |= retro_pico_map[i].pico;
+		}
       }
-if(PicoIn.pad[pad])printf("input[%d]=%08X\n",pad,PicoIn.pad[pad]);
+if(PicoIn.pad[pad])printf("input[%d]=%08X/%08X bm=%s\n",pad,PicoIn.pad[pad],asgn,libretro_supports_bitmasks?"yes":"no");
    }
 
    if (PicoPatches)
