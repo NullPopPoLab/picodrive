@@ -1099,13 +1099,13 @@ static void disk_tray_close(void)
 
 
 static const char * const biosfiles_us[] = {
-   "segacd/us_scd2_9306", "segacd/SegaCDBIOS9303", "segacd/us_scd1_9210", "segacd/bios_CD_U"
+   "megadrive/us_scd2_9306", "megadrive/SegaCDBIOS9303", "megadrive/us_scd1_9210", "megadrive/bios_CD_U"
 };
 static const char * const biosfiles_eu[] = {
-   "segacd/eu_mcd2_9306", "segacd/eu_mcd2_9303", "segacd/eu_mcd1_9210", "segacd/bios_CD_E"
+   "megadrive/eu_mcd2_9306", "megadrive/eu_mcd2_9303", "megadrive/eu_mcd1_9210", "megadrive/bios_CD_E"
 };
 static const char * const biosfiles_jp[] = {
-   "segacd/jp_mcd2_921222", "segacd/jp_mcd1_9112", "segacd/jp_mcd1_9111", "segacd/bios_CD_J"
+   "megadrive/jp_mcd2_921222", "megadrive/jp_mcd1_9112", "megadrive/jp_mcd1_9111", "megadrive/bios_CD_J"
 };
 
 static void make_system_path(char *buf, size_t buf_size,
