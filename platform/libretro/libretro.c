@@ -1292,7 +1292,7 @@ bool retro_load_game(const struct retro_game_info *info)
                   }
 
                   /* append file path to disk image file name */
-                  sprintf(pathbuf, "%s%c%s", g_rom_dir, slash, sizeof(pathbuf)-1);
+                  sprintf(pathbuf, "%s/%s", g_rom_dir, sizeof(pathbuf)-1);
                   pathbuf[sizeof(pathbuf)-1]=0;
                   disks[disk_count].fname = strdup(pathbuf);
                   disk_count++;
