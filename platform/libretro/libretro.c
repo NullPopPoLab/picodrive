@@ -1269,6 +1269,17 @@ bool retro_load_game(const struct retro_game_info *info)
          int len;
          char linebuf[512];
          char pathbuf[512];
+         char dirbuf[512];
+         char *c;
+         strncpy(dirbuf,info->path,sizeof(dirbuf));
+         dirbuf[sizeof(dirbuf)-1]=0;
+         for(c=dirbuf;*c;++c);
+         for(;c>dirbuf;--c){
+			if(c[-1]!='/')continue;
+			*c=0;
+			break;
+         }
+
          while ((filestream_gets(fd, linebuf, 512) != NULL) && (disk_count < disks_max))
          {
             /* skip commented lines */
@@ -1292,7 +1303,7 @@ bool retro_load_game(const struct retro_game_info *info)
                   }
 
                   /* append file path to disk image file name */
-                  sprintf(pathbuf, "%s/%s", g_rom_dir, sizeof(pathbuf)-1);
+                  snprintf(pathbuf, sizeof(pathbuf), "%s%s", dirbuf, linebuf);
                   pathbuf[sizeof(pathbuf)-1]=0;
                   disks[disk_count].fname = strdup(pathbuf);
                   disk_count++;
