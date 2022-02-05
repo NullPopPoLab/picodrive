@@ -750,7 +750,7 @@ void retro_get_system_info(struct retro_system_info *info)
 #define _GIT_VERSION "-" GIT_VERSION
 #endif
    info->library_version = VERSION _GIT_VERSION;
-   info->valid_extensions = "bin|gen|smd|md|32x|cue|iso|chd|sms|gg";
+   info->valid_extensions = "bin|gen|smd|md|32x|cue|iso|chd|sms|gg|m3u";
    info->need_fullpath = true;
 }
 
@@ -984,10 +984,38 @@ static unsigned int disk_count;
 static struct disks_state {
    char *fname;
 } disks[8];
+static unsigned int disks_max=sizeof(disks) / sizeof(disks[0]);
 
 static bool disk_set_eject_state(bool ejected)
 {
-   // TODO?
+	if(ejected){
+		cdd_unload();
+	}
+	else{
+		enum cd_track_type cd_type;
+		int ret;
+
+	   if (disks[index].fname == NULL) {
+	      if (log_cb)
+	         log_cb(RETRO_LOG_ERROR, "missing disk #%u\n", index);
+	      return false;
+	   }
+
+	   if (log_cb)
+	      log_cb(RETRO_LOG_INFO, "switching to disk %u: \"%s\"\n", index,
+	            disks[index].fname);
+
+	   ret = -1;
+	   cd_type = PicoCdCheck(disks[index].fname, NULL);
+	   if (cd_type >= 0 && cd_type != CT_UNKNOWN)
+	      ret = cdd_load(disks[index].fname, cd_type);
+	   if (ret != 0) {
+	      if (log_cb)
+	         log_cb(RETRO_LOG_ERROR, "Load failed, invalid CD image?\n");
+	      return false;
+	   }
+	}
+
    disk_ejected = ejected;
    return true;
 }
@@ -1004,38 +1032,11 @@ static unsigned int disk_get_image_index(void)
 
 static bool disk_set_image_index(unsigned int index)
 {
-   enum cd_track_type cd_type;
-   int ret;
-
-   if (index >= sizeof(disks) / sizeof(disks[0]))
+   if (index >= disks_max)
       return false;
 
-   if (disks[index].fname == NULL) {
-      if (log_cb)
-         log_cb(RETRO_LOG_ERROR, "missing disk #%u\n", index);
-
-      // RetroArch specifies "no disk" with index == count,
-      // so don't fail here..
-      disk_current_index = index;
-      return true;
-   }
-
-   if (log_cb)
-      log_cb(RETRO_LOG_INFO, "switching to disk %u: \"%s\"\n", index,
-            disks[index].fname);
-
-   ret = -1;
-   cd_type = PicoCdCheck(disks[index].fname, NULL);
-   if (cd_type >= 0 && cd_type != CT_UNKNOWN)
-      ret = cdd_load(disks[index].fname, cd_type);
-   if (ret != 0) {
-      if (log_cb)
-         log_cb(RETRO_LOG_ERROR, "Load failed, invalid CD image?\n");
-      return 0;
-   }
-
-   disk_current_index = index;
-   return true;
+	disk_current_index=index;
+	return true;
 }
 
 static unsigned int disk_get_num_images(void)
@@ -1048,7 +1049,7 @@ static bool disk_replace_image_index(unsigned index,
 {
    bool ret = true;
 
-   if (index >= sizeof(disks) / sizeof(disks[0]))
+   if (index >= disks_max)
       return false;
 
    if (disks[index].fname != NULL)
@@ -1066,7 +1067,7 @@ static bool disk_replace_image_index(unsigned index,
 
 static bool disk_add_image_index(void)
 {
-   if (disk_count >= sizeof(disks) / sizeof(disks[0]))
+   if (disk_count >= disks_max)
       return false;
 
    disk_count++;
@@ -1253,7 +1254,7 @@ bool retro_load_game(const struct retro_game_info *info)
       return false;
    }
 
-   for (i = 0; i < sizeof(disks) / sizeof(disks[0]); i++) {
+   for (i = 0; i < disks_max; i++) {
       if (disks[i].fname != NULL) {
          free(disks[i].fname);
          disks[i].fname = NULL;
@@ -1261,12 +1262,53 @@ bool retro_load_game(const struct retro_game_info *info)
    }
 
    disk_current_index = 0;
-   disk_count = 1;
-   disks[0].fname = strdup(info->path);
+	if(!strcmp(&info->path[strlen(info->path)-4],".m3u")){
+      RFILE *fd = filestream_open(info->path, RETRO_VFS_FILE_ACCESS_READ, RETRO_VFS_FILE_ACCESS_HINT_NONE);
+      if (fd)
+      {
+         int len;
+         char linebuf[512];
+         char pathbuf[512];
+         while ((filestream_gets(fd, linebuf, 512) != NULL) && (disk_count < disks_max))
+         {
+            /* skip commented lines */
+            if (linebuf[0] != '#')
+            {
+               len = strlen(linebuf);
+               if (len > 0)
+               {
+                  /* remove end-of-line character */
+                  if (linebuf[len-1] == '\n')
+                  {
+                     linebuf[len-1] = 0;
+                     len--;
+                  }
+
+                  /* remove carriage-return character */
+                  if (len && (linebuf[len-1] == '\r'))
+                  {
+                     linebuf[len-1] = 0;
+                     len--;
+                  }
+
+                  /* append file path to disk image file name */
+                  sprintf(pathbuf, "%s%c%s", g_rom_dir, slash, sizeof(pathbuf)-1);
+                  pathbuf[sizeof(pathbuf)-1]=0;
+                  disks[disk_count].fname = strdup(pathbuf);
+                  disk_count++;
+               }
+            }
+         }
+      }
+	}
+	else{
+		disk_count = 1;
+		disks[0].fname = strdup(info->path);
+	}
 
    make_system_path(carthw_path, sizeof(carthw_path), "carthw", ".cfg");
 
-   media_type = PicoLoadMedia(info->path, carthw_path,
+   media_type = PicoLoadMedia(disks[0].fname, carthw_path,
          find_bios, NULL);
 
    switch (media_type) {
@@ -1943,7 +1985,7 @@ void retro_deinit(void)
 
    PicoExit();
 
-   for (i = 0; i < sizeof(disks) / sizeof(disks[0]); i++) {
+   for (i = 0; i < disks_max; i++) {
       if (disks[i].fname != NULL) {
          free(disks[i].fname);
          disks[i].fname = NULL;
