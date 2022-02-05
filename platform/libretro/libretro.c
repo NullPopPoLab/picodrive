@@ -995,20 +995,20 @@ static bool disk_set_eject_state(bool ejected)
 		enum cd_track_type cd_type;
 		int ret;
 
-	   if (disks[index].fname == NULL) {
+	   if (disks[disk_current_index].fname == NULL) {
 	      if (log_cb)
-	         log_cb(RETRO_LOG_ERROR, "missing disk #%u\n", index);
+	         log_cb(RETRO_LOG_ERROR, "missing disk #%u\n", disk_current_index);
 	      return false;
 	   }
 
 	   if (log_cb)
-	      log_cb(RETRO_LOG_INFO, "switching to disk %u: \"%s\"\n", index,
-	            disks[index].fname);
+	      log_cb(RETRO_LOG_INFO, "switching to disk %u: \"%s\"\n", disk_current_index,
+	            disks[disk_current_index].fname);
 
 	   ret = -1;
-	   cd_type = PicoCdCheck(disks[index].fname, NULL);
+	   cd_type = PicoCdCheck(disks[disk_current_index].fname, NULL);
 	   if (cd_type >= 0 && cd_type != CT_UNKNOWN)
-	      ret = cdd_load(disks[index].fname, cd_type);
+	      ret = cdd_load(disks[disk_current_index].fname, cd_type);
 	   if (ret != 0) {
 	      if (log_cb)
 	         log_cb(RETRO_LOG_ERROR, "Load failed, invalid CD image?\n");
