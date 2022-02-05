@@ -1311,6 +1311,7 @@ bool retro_load_game(const struct retro_game_info *info)
                }
             }
          }
+		filestream_close(fd);
       }
 	}
 	else{
