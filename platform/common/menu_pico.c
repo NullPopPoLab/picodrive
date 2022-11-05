@@ -42,7 +42,7 @@ static const char *rom_exts[] = {
 	"bin", "smd", "gen", "md",
 	"iso", "cso", "cue", "chd",
 	"32x",
-	"sms", "gg",
+	"sms", "gg",  "sg",
 	NULL
 };
 
@@ -97,10 +97,9 @@ static void make_bg(int no_scale, int from_screen)
 		pp = g_screen_ppitch;
 	}
 
-	if (src == NULL) {
-		memset(g_menubg_ptr, 0, g_menuscreen_w * g_menuscreen_h * 2);
+	memset(g_menubg_ptr, 0, g_menuscreen_w * g_menuscreen_h * 2);
+	if (src == NULL)
 		return;
-	}
 
 	if (!no_scale && g_menuscreen_w / w >= 2 && g_menuscreen_h / h >= 2)
 	{
@@ -366,6 +365,12 @@ static int key_config_loop_wrap(int id, int keys)
 		case MA_CTRL_PLAYER2:
 			key_config_loop(me_ctrl_actions, array_size(me_ctrl_actions) - 1, 1);
 			break;
+		case MA_CTRL_PLAYER3:
+			key_config_loop(me_ctrl_actions, array_size(me_ctrl_actions) - 1, 2);
+			break;
+		case MA_CTRL_PLAYER4:
+			key_config_loop(me_ctrl_actions, array_size(me_ctrl_actions) - 1, 3);
+			break;
 		case MA_CTRL_EMU:
 			key_config_loop(emuctrl_actions, array_size(emuctrl_actions) - 1, -1);
 			break;
@@ -396,15 +401,18 @@ static const char *mgn_dev_name(int id, int *offs)
 static int mh_saveloadcfg(int id, int keys);
 static const char *mgn_saveloadcfg(int id, int *offs);
 
-const char *indev_names[] = { "none", "3 button pad", "6 button pad", NULL };
+const char *indev0_names[] = { "none", "3 button pad", "6 button pad", "Team player", "4 way play", NULL };
+const char *indev1_names[] = { "none", "3 button pad", "6 button pad", NULL };
 
 static menu_entry e_menu_keyconfig[] =
 {
 	mee_handler_id("Player 1",          MA_CTRL_PLAYER1,    key_config_loop_wrap),
 	mee_handler_id("Player 2",          MA_CTRL_PLAYER2,    key_config_loop_wrap),
+	mee_handler_id("Player 3",          MA_CTRL_PLAYER3,    key_config_loop_wrap),
+	mee_handler_id("Player 4",          MA_CTRL_PLAYER4,    key_config_loop_wrap),
 	mee_handler_id("Emulator controls", MA_CTRL_EMU,        key_config_loop_wrap),
-	mee_enum      ("Input device 1",    MA_OPT_INPUT_DEV0,  currentConfig.input_dev0, indev_names),
-	mee_enum      ("Input device 2",    MA_OPT_INPUT_DEV1,  currentConfig.input_dev1, indev_names),
+	mee_enum      ("Input device 1",    MA_OPT_INPUT_DEV0,  currentConfig.input_dev0, indev0_names),
+	mee_enum      ("Input device 2",    MA_OPT_INPUT_DEV1,  currentConfig.input_dev1, indev1_names),
 	mee_range     ("Turbo rate",        MA_CTRL_TURBO_RATE, currentConfig.turbo_rate, 1, 30),
 	mee_range     ("Analog deadzone",   MA_CTRL_DEADZONE,   currentConfig.analog_deadzone, 1, 99),
 	mee_cust_nosave("Save global config",       MA_OPT_SAVECFG, mh_saveloadcfg, mgn_saveloadcfg),
@@ -527,8 +535,8 @@ static int menu_loop_32x_options(int id, int keys)
 
 #ifndef NO_SMS
 
-static const char *sms_hardwares[] = { "auto", "Game Gear", "Master System", NULL };
-static const char *sms_mappers[] = { "auto", "Sega", "Codemasters", "Korea", "Korea MSX", "Korea X-in-1", "Korea 4-Pak", "Korea Janggun", "Korea Nemesis", NULL };
+static const char *sms_hardwares[] = { "auto", "Game Gear", "Master System", "SG-1000", NULL };
+static const char *sms_mappers[] = { "auto", "Sega", "Codemasters", "Korea", "Korea MSX", "Korea X-in-1", "Korea 4-Pak", "Korea Janggun", "Korea Nemesis", "Taiwan 8K RAM", NULL };
 static const char h_smsfm[] = "FM sound is only supported by few games\nOther games may crash with FM enabled";
 
 static menu_entry e_menu_sms_options[] =
@@ -561,6 +569,7 @@ static menu_entry e_menu_adv_options[] =
 	mee_onoff     ("Emulate Z80",              MA_OPT2_ENABLE_Z80,    PicoIn.opt, POPT_EN_Z80),
 	mee_onoff     ("Emulate YM2612 (FM)",      MA_OPT2_ENABLE_YM2612, PicoIn.opt, POPT_EN_FM),
 	mee_onoff     ("Disable YM2612 SSG-EG",    MA_OPT2_DISABLE_YM_SSG,PicoIn.opt, POPT_DIS_FM_SSGEG),
+	mee_onoff     ("Enable YM2612 DAC noise",  MA_OPT2_ENABLE_YM_DAC, PicoIn.opt, POPT_EN_FM_DAC),
 	mee_onoff     ("Emulate SN76496 (PSG)",    MA_OPT2_ENABLE_SN76496,PicoIn.opt, POPT_EN_PSG),
 	mee_onoff     ("Emulate Game Gear LCD",    MA_OPT2_ENABLE_GGLCD  ,PicoIn.opt, POPT_EN_GG_LCD),
 	mee_onoff     ("Disable idle loop patching",MA_OPT2_NO_IDLE_LOOPS,PicoIn.opt, POPT_DIS_IDLE_DET),
@@ -1306,6 +1315,7 @@ static menu_entry e_menu_hidden[] =
 {
 	mee_onoff("Accurate sprites", MA_OPT_ACC_SPRITES, PicoIn.opt, POPT_ACC_SPRITES),
 	mee_onoff("autoload savestates", MA_OPT_AUTOLOAD_SAVE, g_autostateld_opt, 1),
+	mee_onoff("SDL fullscreen mode", MA_OPT_VOUT_FULL, plat_target.vout_fullscreen, 1),
 	mee_end,
 };
 

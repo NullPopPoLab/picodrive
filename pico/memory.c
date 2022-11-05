@@ -240,9 +240,9 @@ static u32 read_pad_6btn(int i, u32 out_bits)
   }
   else if(phase == 3) {
     if (out_bits & 0x40)
-      return (pad & 0x30) | ((pad >> 8) & 0xf);  // ?1CB MXYZ
+      value = (pad & 0x30) | ((pad >> 8) & 0xf); // ?1CB MXYZ
     else
-      return ((pad & 0xc0) >> 2) | 0x0f;         // ?0SA 1111
+      value = ((pad & 0xc0) >> 2) | 0x0f;        // ?0SA 1111
     goto out;
   }
 
@@ -253,6 +253,51 @@ static u32 read_pad_6btn(int i, u32 out_bits)
 
 out:
   value |= out_bits & 0x40;
+  return value;
+}
+
+static u32 read_pad_team(int i, u32 out_bits)
+{
+  u32 pad;
+  int phase = Pico.m.padTHPhase[i];
+  u32 value;
+
+  switch (phase) {
+  case 0:
+    value = 0x03;
+    break;
+  case 1:
+    value = 0x0f;
+    break;
+  case 4: case 5: case 6: case 7: // controller IDs, all 3 btn for now
+    value = 0x00;
+    break;
+  case 8: case 10: case 12: case 14:
+    pad = ~PicoIn.padInt[(phase-8) >> 1];
+    value = pad & 0x0f;                          // ?x?x RLDU
+    break;
+  case 9: case 11: case 13: case 15:
+    pad = ~PicoIn.padInt[(phase-8) >> 1];
+    value = (pad & 0xf0) >>  4;                  // ?x?x SACB
+    break;
+  default:
+    value = 0;
+    break;
+  }
+
+  value |= (out_bits & 0x40) | ((out_bits & 0x20)>>1);
+  return value;
+}
+
+static u32 read_pad_4way(int i, u32 out_bits)
+{
+  u32 pad = (PicoMem.ioports[2] & 0x70) >> 4;
+  u32 value = 0;
+
+  if (i == 0 && pad <= 3)
+    value = read_pad_3btn(pad, out_bits);
+
+  value |= (out_bits & 0x40);
   return value;
 }
 
@@ -281,7 +326,7 @@ static NOINLINE u32 port_read(int i)
   // disables output before doing TH-low read, so don't emulate it for TH.
   // Decap Attack reportedly doesn't work on Nomad but works on must
   // other MD revisions (different pull-up strength?).
-  if (PicoIn.AHW & PAHW_32X) // don't do it on 32X, it breaks WWF Raw
+  if (PicoIn.AHW & (PAHW_32X|PAHW_MCD)) // don't do it on 32X, it breaks WWF Raw
     out |= 0x7f & ~ctrl_reg;
   else
     out |= 0x3f & ~ctrl_reg;
@@ -298,13 +343,24 @@ void PicoSetInputDevice(int port, enum input_device device)
   if (port < 0 || port > 2)
     return;
 
-  switch (device) {
+  if (port == 1 && port_readers[0] == read_pad_team)
+    func = read_nothing;
+
+  else switch (device) {
   case PICO_INPUT_PAD_3BTN:
     func = read_pad_3btn;
     break;
 
   case PICO_INPUT_PAD_6BTN:
     func = read_pad_6btn;
+    break;
+
+  case PICO_INPUT_PAD_TEAM:
+    func = read_pad_team;
+    break;
+
+  case PICO_INPUT_PAD_4WAY:
+    func = read_pad_4way;
     break;
 
   default:
@@ -337,7 +393,17 @@ NOINLINE void io_ports_write(u32 a, u32 d)
   if (1 <= a && a <= 2)
   {
     Pico.m.padDelay[a - 1] = 0;
-    if (!(PicoMem.ioports[a] & 0x40) && (d & 0x40))
+    if (port_readers[a - 1] == read_pad_team) {
+      if (d & 0x40)
+        Pico.m.padTHPhase[a - 1] = 0;
+      else if ((d^PicoMem.ioports[a]) & 0x60)
+        Pico.m.padTHPhase[a - 1]++;
+    } else if (port_readers[0] == read_pad_4way) {
+      if (a == 2 && ((PicoMem.ioports[a] ^ d) & 0x70))
+        Pico.m.padTHPhase[0] = 0;
+      if (a == 1 && !(PicoMem.ioports[a] & 0x40) && (d & 0x40))
+        Pico.m.padTHPhase[0]++;
+    } else if (!(PicoMem.ioports[a] & 0x40) && (d & 0x40))
       Pico.m.padTHPhase[a - 1]++;
   }
 

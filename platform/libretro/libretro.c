@@ -15,12 +15,10 @@
 #include <stdarg.h>
 #include <string.h>
 #ifndef _WIN32
-#ifndef NO_MMAP
 #ifdef __SWITCH__
 #include "switch/mman.h"
 #else
 #include <sys/mman.h>
-#endif
 #endif
 #else
 #include <io.h>
@@ -32,10 +30,6 @@
 #include <libkern/OSCacheControl.h>
 #endif
 
-#ifdef USE_LIBRETRO_VFS
-#include "file_stream_transforms.h"
-#endif
-
 #if defined(RENDER_GSKIT_PS2)
 #include <malloc.h>
 #include "libretro-common/include/libretro_gskit_ps2.h"
@@ -43,6 +37,7 @@
 #else
 #include <platform/common/upscale.h>
 #endif
+#include <platform/common/emu.h>
 
 #ifdef _3DS
 #include "3ds/3ds_utils.h"
@@ -344,30 +339,6 @@ static void munmap(void *addr, size_t length)
    UnmapViewOfFile(addr);
    /* ruh-ro, we leaked handle from CreateFileMapping() ... */
 }
-#elif defined(NO_MMAP)
-#define PROT_EXEC   0x04
-#define MAP_FAILED 0
-#define PROT_READ 0
-#define PROT_WRITE 0
-#define MAP_PRIVATE 0
-#define MAP_ANONYMOUS 0
-
-void* mmap(void *desired_addr, size_t len, int mmap_prot, int mmap_flags, int fildes, size_t off)
-{
-   return calloc(1, len);
-}
-
-void munmap(void *base_addr, size_t len)
-{
-   free(base_addr);
-}
-
-int mprotect(void *addr, size_t len, int prot)
-{
-   /* stub - not really needed at this point since this codepath has no dynarecs */
-   return 0;
-}
-
 #endif
 
 #ifndef MAP_ANONYMOUS
@@ -620,6 +591,17 @@ int plat_mem_set_exec(void *ptr, size_t size)
    return ret;
 }
 
+static void apply_renderer()
+{
+   PicoIn.opt &= ~(POPT_ALT_RENDERER|POPT_EN_SOFTSCALE);
+   PicoIn.opt |= POPT_DIS_32C_BORDER;
+   if (vout_format == PDF_NONE)
+      PicoIn.opt |= POPT_ALT_RENDERER;
+   PicoDrawSetOutFormat(vout_format, 0);
+   if (!vout_16bit && vout_format == PDF_8BIT)
+      PicoDrawSetOutBuf(Pico.est.Draw2FB, 328);
+}
+
 void emu_video_mode_change(int start_line, int line_count, int start_col, int col_count)
 {
    struct retro_system_av_info av_info;
@@ -630,8 +612,6 @@ void emu_video_mode_change(int start_line, int line_count, int start_col, int co
    vm_current_col_count = col_count;
 
    // 8bit renderes create a 328x256 CLUT image, while 16bit creates 320x240 RGB
-   vout_16bit = vout_format == PDF_RGB555 || (PicoIn.AHW & PAHW_32X);
-
 #if defined(RENDER_GSKIT_PS2)
    // calculate the borders of the real image inside the picodrive image
    vout_width = (vout_16bit ? VOUT_MAX_WIDTH : VOUT_8BIT_WIDTH);
@@ -681,7 +661,10 @@ void emu_video_mode_change(int start_line, int line_count, int start_col, int co
 
 void emu_32x_startup(void)
 {
+   PicoIn.filter = EOPT_FILTER_SMOOTHER; // for H32 upscaling
    PicoDrawSetOutFormat(vout_format, 0);
+   vout_16bit = 1;
+
    if ((vm_current_start_line != -1) &&
        (vm_current_line_count != -1) &&
        (vm_current_start_col != -1) &&
@@ -751,7 +734,7 @@ void retro_get_system_info(struct retro_system_info *info)
 #define _GIT_VERSION "-" GIT_VERSION
 #endif
    info->library_version = VERSION _GIT_VERSION;
-   info->valid_extensions = "bin|gen|smd|md|32x|cue|iso|chd|sms|gg|m3u";
+   info->valid_extensions = "bin|gen|smd|md|32x|cue|iso|chd|sms|gg|sg|m3u";
    info->need_fullpath = true;
 }
 
@@ -860,9 +843,14 @@ int state_fseek(void *file, long offset, int whence)
 size_t retro_serialize_size(void)
 {
    struct savestate_state state = { 0, };
+   unsigned AHW = PicoIn.AHW;
    int ret;
 
+   /* we need the max possible size here, so include 32X for MD and MCD */
+   if (!(AHW & (PAHW_SMS|PAHW_PICO|PAHW_SVP)))
+      PicoIn.AHW |= PAHW_32X;
    ret = PicoStateFP(&state, 1, NULL, state_skip, NULL, state_fseek);
+   PicoIn.AHW = AHW;
    if (ret != 0)
       return 0;
 
@@ -1219,6 +1207,34 @@ bool retro_load_game(const struct retro_game_info *info)
       { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R,     "Mode" },
       { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START, "Start" },
 
+
+      { 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT,  "D-Pad Left" },
+      { 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP,    "D-Pad Up" },
+      { 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN,  "D-Pad Down" },
+      { 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT, "D-Pad Right" },
+      { 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B,     "B" },
+      { 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A,     "C" },
+      { 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X,     "Y" },
+      { 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y,     "A" },
+      { 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L,     "X" },
+      { 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R,     "Z" },
+      { 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT,"Mode" },
+      { 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START, "Start" },
+
+
+      { 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT,  "D-Pad Left" },
+      { 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP,    "D-Pad Up" },
+      { 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN,  "D-Pad Down" },
+      { 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT, "D-Pad Right" },
+      { 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B,     "B" },
+      { 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A,     "C" },
+      { 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X,     "Y" },
+      { 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y,     "A" },
+      { 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L,     "X" },
+      { 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R,     "Z" },
+      { 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT,"Mode" },
+      { 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START, "Start" },
+
       { 0 },
    };
 
@@ -1357,9 +1373,7 @@ bool retro_load_game(const struct retro_game_info *info)
    PicoIn.sndOut = sndBuffer;
    PsndRerate(0);
 
-   PicoDrawSetOutFormat(vout_format, 0);
-   if (vout_format == PDF_8BIT)
-      PicoDrawSetOutBuf(Pico.est.Draw2FB, 328);
+   apply_renderer();
 
    /* Setup retro memory maps */
    set_memory_maps();
@@ -1475,6 +1489,8 @@ static const retro_pico_assign retro_pico_map[] = {
 };
 #define RETRO_PICO_MAP_LEN (sizeof(retro_pico_map) / sizeof(retro_pico_map[0]))
 
+static int has_4_pads;
+
 static void snd_write(int len)
 {
    audio_batch_cb(PicoIn.sndOut, len / 4);
@@ -1486,6 +1502,10 @@ static enum input_device input_name_to_val(const char *name)
       return PICO_INPUT_PAD_3BTN;
    if (strcmp(name, "6 button pad") == 0)
       return PICO_INPUT_PAD_6BTN;
+   if (strcmp(name, "team player") == 0)
+      return PICO_INPUT_PAD_TEAM;
+   if (strcmp(name, "4way play") == 0)
+      return PICO_INPUT_PAD_4WAY;
    if (strcmp(name, "None") == 0)
       return PICO_INPUT_NOTHING;
 
@@ -1507,8 +1527,11 @@ static void update_variables(bool first_run)
 
    var.value = NULL;
    var.key = "picodrive_input1";
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-      PicoSetInputDevice(0, input_name_to_val(var.value));
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
+      int input = input_name_to_val(var.value);
+      PicoSetInputDevice(0, input);
+      has_4_pads = input == PICO_INPUT_PAD_TEAM || input == PICO_INPUT_PAD_4WAY;
+   }
 
    var.value = NULL;
    var.key = "picodrive_input2";
@@ -1531,6 +1554,8 @@ static void update_variables(bool first_run)
          PicoIn.hwSelect = PHWS_AUTO;
       else if (strcmp(var.value, "Game Gear") == 0)
          PicoIn.hwSelect = PHWS_GG;
+      else if (strcmp(var.value, "SG-1000") == 0)
+         PicoIn.hwSelect = PHWS_SG;
       else
          PicoIn.hwSelect = PHWS_SMS;
    }
@@ -1563,6 +1588,8 @@ static void update_variables(bool first_run)
          PicoIn.mapper = PMS_MAP_JANGGUN;
       else if (strcmp(var.value, "Korea Nemesis") == 0)
          PicoIn.mapper = PMS_MAP_NEMESIS;
+      else if (strcmp(var.value, "Taiwan 8K RAM") == 0)
+         PicoIn.mapper = PMS_MAP_8KBRAM;
       else
          PicoIn.mapper = PMS_MAP_SEGA;
    }
@@ -1654,6 +1681,15 @@ static void update_variables(bool first_run)
       PicoIn.opt &= ~POPT_EN_DRC;
 #endif
 
+   var.value = NULL;
+   var.key = "picodrive_dacnoise";
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
+      if (strcmp(var.value, "enabled") == 0)
+         PicoIn.opt |= POPT_EN_FM_DAC;
+      else
+         PicoIn.opt &= ~POPT_EN_FM_DAC;
+   }
+
    old_snd_filter = PicoIn.opt & POPT_EN_SNDFILTER;
    var.value = NULL;
    var.key = "picodrive_audio_filter";
@@ -1702,13 +1738,9 @@ static void update_variables(bool first_run)
          vout_format = PDF_8BIT;
       else if (strcmp(var.value, "accurate") == 0)
          vout_format = PDF_RGB555;
+      vout_16bit = vout_format == PDF_RGB555 || (PicoIn.AHW & PAHW_32X);
 
-      PicoIn.opt &= ~POPT_ALT_RENDERER;
-      if (vout_format == PDF_NONE)
-         PicoIn.opt |= POPT_ALT_RENDERER;
-      PicoDrawSetOutFormat(vout_format, 0);
-      if (vout_format == PDF_8BIT)
-         PicoDrawSetOutBuf(Pico.est.Draw2FB, 328);
+      apply_renderer();
    }
 
    var.value = NULL;
@@ -1747,7 +1779,7 @@ static void update_variables(bool first_run)
 void retro_run(void)
 {
    bool updated = false;
-   int pad, i;
+   int pad, i, padcount;
    static void *buff;
    int32_t input;
 
@@ -1758,8 +1790,9 @@ void retro_run(void)
 
    input_poll_cb();
 
-   PicoIn.pad[0] = PicoIn.pad[1] = 0;
-   for (pad = 0; pad < 2; pad++) {
+   PicoIn.pad[0] = PicoIn.pad[1] = PicoIn.pad[2] = PicoIn.pad[3] = 0;
+   padcount = has_4_pads && !(PicoIn.AHW & (PAHW_SMS|PAHW_PICO)) ? 4 : 2;
+   for (pad = 0; pad < padcount; pad++) {
       if (libretro_supports_bitmasks) {
          input = input_state_cb(pad, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_MASK);
          for (i = 0; i < RETRO_PICO_MAP_LEN; i++)

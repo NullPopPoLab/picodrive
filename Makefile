@@ -49,7 +49,7 @@ endif
 	LINKOUT ?= -o
 endif
 
-ifeq ("$(PLATFORM)",$(filter "$(PLATFORM)","gp2x" "opendingux" "rpi1"))
+ifeq ("$(PLATFORM)",$(filter "$(PLATFORM)","gp2x" "opendingux" "miyoo" "rpi1"))
 # very small caches, avoid optimization options making the binary much bigger
 CFLAGS += -finline-limit=42 -fno-unroll-loops -fno-ipa-cp -ffast-math
 # this gets you about 20% better execution speed on 32bit arm/mips
@@ -115,6 +115,21 @@ OBJS += platform/opendingux/inputmap.o
 use_inputmap ?= 1
 
 # OpenDingux is a generic platform, really.
+PLATFORM := generic
+endif
+ifeq "$(PLATFORM)" "miyoo"
+$(TARGET).zip: $(TARGET)
+	$(RM) -rf .od_data
+	cp -r platform/opendingux/data/. .od_data
+	cp platform/game_def.cfg .od_data
+	cp $< .od_data/PicoDrive
+	$(STRIP) .od_data/PicoDrive
+	rm -f .od_data/default.*.desktop .od_data/PicoDrive.dge
+	cd .od_data && zip -9 -r ../$@ *
+all: $(TARGET).zip
+
+OBJS += platform/opendingux/inputmap.o
+use_inputmap ?= 1
 PLATFORM := generic
 endif
 ifeq ("$(PLATFORM)",$(filter "$(PLATFORM)","rpi1" "rpi2"))
@@ -195,13 +210,20 @@ USE_FRONTEND = 1
 endif
 ifeq "$(PLATFORM)" "libretro"
 OBJS += platform/libretro/libretro.o
+ifeq "$(USE_LIBRETRO_VFS)" "1"
+OBJS += platform/libretro/libretro-common/compat/compat_strcasestr.o
 OBJS += platform/libretro/libretro-common/compat/compat_posix_string.o
 OBJS += platform/libretro/libretro-common/compat/compat_strl.o
 OBJS += platform/libretro/libretro-common/compat/fopen_utf8.o
+OBJS += platform/libretro/libretro-common/file/file_path.o
+OBJS += platform/libretro/libretro-common/memmap/memmap.o
 OBJS += platform/libretro/libretro-common/encodings/encoding_utf.o
+OBJS += platform/libretro/libretro-common/string/stdstring.o
 OBJS += platform/libretro/libretro-common/streams/file_stream.o
 OBJS += platform/libretro/libretro-common/streams/file_stream_transforms.o
+OBJS += platform/libretro/libretro-common/time/rtime.o
 OBJS += platform/libretro/libretro-common/vfs/vfs_implementation.o
+endif
 PLATFORM_ZLIB ?= 1
 endif
 
@@ -303,6 +325,8 @@ target_: $(TARGET)
 
 clean:
 	$(RM) $(TARGET) $(OBJS) pico/pico_int_offs.h
+	$(MAKE) -C cpu/cyclone clean
+	$(MAKE) -C cpu/musashi clean
 	$(RM) -r .od_data
 
 $(TARGET): $(OBJS)
@@ -310,7 +334,7 @@ $(TARGET): $(OBJS)
 ifeq ($(STATIC_LINKING), 1)
 	$(AR) rcs $@ $^
 else
-	$(LD) $(LINKOUT)$@ $^ $(LDFLAGS) $(LDLIBS)
+	$(LD) $(LINKOUT)$@ $^ $(CFLAGS) $(LDFLAGS) $(LDLIBS)
 endif
 
 ifeq "$(PLATFORM)" "psp"

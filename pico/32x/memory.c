@@ -1461,7 +1461,7 @@ static u32 REGPARM(2) sh2_read8_cs0(u32 a, SH2 *sh2)
 
   if ((a & 0x3fff0) == 0x4100) {
     d = p32x_vdp_read16(a);
-    p32x_sh2_poll_detect(a, sh2, SH2_STATE_VPOLL, 7);
+    p32x_sh2_poll_detect(a, sh2, SH2_STATE_VPOLL, 9);
     goto out_16to8;
   }
 
@@ -1524,7 +1524,7 @@ static u32 REGPARM(2) sh2_read16_cs0(u32 a, SH2 *sh2)
 
   if ((a & 0x3fff0) == 0x4100) {
     d = p32x_vdp_read16(a);
-    p32x_sh2_poll_detect(a, sh2, SH2_STATE_VPOLL, 7);
+    p32x_sh2_poll_detect(a, sh2, SH2_STATE_VPOLL, 9);
     goto out;
   }
 
@@ -1999,11 +1999,7 @@ int p32x_sh2_memcpy(u32 dst, u32 src, int count, int size, SH2 *sh2)
     u16 dl, dh = *sp++;
     for (i = 0; i < (len & ~1); i += 2, dst += 2, sp++) {
       dl = dh, dh = *sp;
-#if CPU_IS_LE
       p32x_sh2_write16(dst, (dh >> 8) | (dl << 8), sh2);
-#else
-      p32x_sh2_write16(dst, (dl >> 8) | (dh << 8), sh2);
-#endif
     }
     if (len & 1)
       p32x_sh2_write8(dst, dh, sh2);
@@ -2035,7 +2031,7 @@ int p32x_sh2_memcpy(u32 dst, u32 src, int count, int size, SH2 *sh2)
       dst += 2;
     }
     if (len & 1)
-      p32x_sh2_write8(dst, ((u8 *)sp)[MEM_BE2(0)], sh2);
+      p32x_sh2_write8(dst, *sp >> 8, sh2);
   }
 
   return count;
@@ -2300,11 +2296,13 @@ void PicoMemSetup32x(void)
   unsigned int rs;
   int i;
 
-  Pico32xMem = plat_mmap(0x06000000, sizeof(*Pico32xMem), 0, 0);
+  if (Pico32xMem == NULL)
+    Pico32xMem = plat_mmap(0x06000000, sizeof(*Pico32xMem), 0, 0);
   if (Pico32xMem == NULL) {
     elprintf(EL_STATUS, "OOM");
     return;
   }
+  memset(Pico32xMem, 0, sizeof(struct Pico32xMem));
 
   get_bios();
 
@@ -2386,9 +2384,10 @@ void PicoMemSetup32x(void)
   msh2_write32_map[0x00/2] = msh2_write32_map[0x20/2] = sh2_write32_cs0;
   // CS1 - ROM
   bank_switch_rom_sh2();
-  msh2_read8_map[0x02/2].mask  = msh2_read8_map[0x22/2].mask  = 0x3fffff; // FIXME
-  msh2_read16_map[0x02/2].mask = msh2_read16_map[0x22/2].mask = 0x3ffffe; // FIXME
-  msh2_read32_map[0x02/2].mask = msh2_read32_map[0x22/2].mask = 0x3ffffc; // FIXME
+  for (rs = 0x8000; rs < Pico.romsize && rs < 0x400000; rs *= 2) ; 
+  msh2_read8_map[0x02/2].mask  = msh2_read8_map[0x22/2].mask  = rs-1;
+  msh2_read16_map[0x02/2].mask = msh2_read16_map[0x22/2].mask = rs-1;
+  msh2_read32_map[0x02/2].mask = msh2_read32_map[0x22/2].mask = rs-1;
   msh2_write16_map[0x02/2] = msh2_write16_map[0x22/2] = sh2_write16_rom;
   msh2_write32_map[0x02/2] = msh2_write32_map[0x22/2] = sh2_write32_rom;
   // CS2 - DRAM 
@@ -2484,12 +2483,12 @@ void Pico32xMemStateLoaded(void)
   memset(Pico32xMem->pwm, 0, sizeof(Pico32xMem->pwm));
   Pico32x.dirty_pal = 1;
 
-  Pico32x.emu_flags &= ~(P32XF_68KCPOLL | P32XF_68KVPOLL);
   memset(&m68k_poll, 0, sizeof(m68k_poll));
   msh2.state = 0;
   msh2.poll_addr = msh2.poll_cycles = msh2.poll_cnt = 0;
   ssh2.state = 0;
   ssh2.poll_addr = ssh2.poll_cycles = ssh2.poll_cnt = 0;
+  memset(sh2_poll_fifo, 0, sizeof(sh2_poll_fifo));
 
   sh2_drc_flush_all();
 }

@@ -245,7 +245,7 @@ write_comm:
   }
   if (Pico_mcd->m.s68k_poll_a == (a & ~1))
   {
-    if (Pico_mcd->m.s68k_poll_cnt > POLL_LIMIT) {
+    if (SekIsStoppedS68k()) {
       elprintf(EL_CDPOLL, "s68k poll release, a=%02x", a);
       SekSetStopS68k(0);
     }
@@ -1182,7 +1182,7 @@ PICO_INTERNAL void PicoMemSetupCD(void)
 
   // setup FAME fetchmap
   {
-#ifdef __clang__
+#if defined __clang__ || defined HW_WUP
     volatile // prevent strange relocs from clang
 #endif
     uptr ptr_ram = (uptr)PicoMem.ram;
