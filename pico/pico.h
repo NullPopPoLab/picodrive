@@ -76,6 +76,7 @@ extern void *p32x_bios_g, *p32x_bios_m, *p32x_bios_s;
 #define POPT_PWM_IRQ_OPT    (1<<22)
 #define POPT_DIS_FM_SSGEG   (1<<23)
 #define POPT_EN_FM_DAC      (1<<24) //x00 0000
+#define POPT_EN_FM_FILTER   (1<<25)
 
 #define PAHW_MCD    (1<<0)
 #define PAHW_32X    (1<<1)
@@ -187,7 +188,8 @@ size_t   pm_read(void *ptr, size_t bytes, pm_file *stream);
 size_t   pm_read_audio(void *ptr, size_t bytes, pm_file *stream);
 int      pm_seek(pm_file *stream, long offset, int whence);
 int      pm_close(pm_file *fp);
-int PicoCartLoad(pm_file *f,unsigned char **prom,unsigned int *psize,int is_sms);
+int PicoCartLoad(pm_file *f, const unsigned char *rom, unsigned int romsize,
+  unsigned char **prom, unsigned int *psize, int is_sms);
 int PicoCartInsert(unsigned char *rom, unsigned int romsize, const char *carthw_cfg);
 void PicoCartUnload(void);
 extern void (*PicoCartLoadProgressCB)(int percent);
@@ -298,6 +300,7 @@ typedef struct
 
 
 enum media_type_e PicoLoadMedia(const char *filename,
+  const unsigned char *rom, unsigned int romsize,
   const char *carthw_cfg_fname,
   const char *(*get_bios_filename)(int *region, const char *cd_fname),
   void (*do_region_override)(const char *media_filename));

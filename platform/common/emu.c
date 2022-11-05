@@ -57,7 +57,7 @@ int pico_inp_mode;
 int flip_after_sync;
 int engineState = PGS_Menu;
 
-static short __attribute__((aligned(4))) sndBuffer[2*44100/50];
+static short __attribute__((aligned(4))) sndBuffer[2*54000/50];
 
 /* tmp buff to reduce stack usage for plats with small stack */
 static char static_buff[512];
@@ -451,7 +451,7 @@ int emu_reload_rom(const char *rom_fname_in)
 
 	emu_make_path(carthw_path, "carthw.cfg", sizeof(carthw_path));
 
-	media_type = PicoLoadMedia(rom_fname, carthw_path,
+	media_type = PicoLoadMedia(rom_fname, NULL, 0, carthw_path,
 			find_bios, do_region_override);
 
 	switch (media_type) {
@@ -1328,6 +1328,9 @@ void emu_sound_start(void)
 {
 	PicoIn.sndOut = NULL;
 
+	// auto-select rate?
+	if (PicoIn.sndRate > 52000 && PicoIn.sndRate < 54000)
+		PicoIn.sndRate = YM2612_NATIVE_RATE();
 	if (currentConfig.EmuOpt & EOPT_EN_SOUND)
 	{
 		int is_stereo = (PicoIn.opt & POPT_EN_STEREO) ? 1 : 0;
