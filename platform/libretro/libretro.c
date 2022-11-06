@@ -2112,7 +2112,7 @@ void retro_run(void)
    else
       padcount = has_4_pads ? 4 : 2;
 
-   int16_t input[4] = {0, 0};
+   int32_t input[4] = {0, 0};
 
    if (libretro_supports_bitmasks)
    {
