@@ -2095,7 +2095,6 @@ void retro_run(void)
    bool updated = false;
    int pad, i, padcount;
    static void *buff;
-   int32_t input;
 
    PicoIn.skipFrame = 0;
 
@@ -2126,13 +2125,12 @@ void retro_run(void)
    {
       for (pad = 0; pad < padcount; pad++)
       {
-         for (i = 0; i < RETRO_PICO_MAP_LEN; i++)
-            if (input & (1<<retro_pico_map[i].retro))
+         for (i = 0; i < RETRO_PICO_MAP_LEN; i++){
+            if (input[pad] & (1<<retro_pico_map[i].retro))
                PicoIn.pad[pad] |= retro_pico_map[i].pico;
-      } else {
-         for (i = 0; i < RETRO_PICO_MAP_LEN; i++)
-            if (input_state_cb(pad, RETRO_DEVICE_JOYPAD, 0, retro_pico_map[i].retro))
+			else if (input_state_cb(pad, RETRO_DEVICE_JOYPAD, 0, retro_pico_map[i].retro))
                PicoIn.pad[pad] |= retro_pico_map[i].pico;
+		}
       }
    }
 
