@@ -2125,13 +2125,22 @@ void retro_run(void)
    {
       for (pad = 0; pad < padcount; pad++)
       {
-         for (i = 0; i < RETRO_PICO_MAP_LEN; i++){
-            if (input[pad] & (1<<retro_pico_map[i].retro))
-               PicoIn.pad[pad] |= retro_pico_map[i].pico;
-			else if (input_state_cb(pad, RETRO_DEVICE_JOYPAD, 0, retro_pico_map[i].retro))
-               PicoIn.pad[pad] |= retro_pico_map[i].pico;
-		}
+         for (i = 0; i < RETRO_PICO_MAP_LEN; i++)
+            if (input_state_cb(pad, RETRO_DEVICE_JOYPAD, 0, retro_pico_map[i].retro))
+               input[pad] |= 1<<retro_pico_map[i].retro;
       }
+   }
+
+   for (pad = 0; pad < padcount; pad++)
+     for (i = 0; i < RETRO_PICO_MAP_LEN; i++)
+	 if (input[pad] & (1<<retro_pico_map[i].retro))
+	     PicoIn.pad[pad] |= retro_pico_map[i].pico;
+
+   if (PicoIn.AHW == PAHW_PICO) {
+       uint16_t ev = input[0] & ((1 << RETRO_DEVICE_ID_JOYPAD_L) | (1 << RETRO_DEVICE_ID_JOYPAD_R) | (1 << RETRO_DEVICE_ID_JOYPAD_SELECT));
+       uint16_t new_ev = ev & ~pico_events;
+       pico_events = ev;
+       run_events_pico(new_ev);
    }
 
    if (PicoPatches)
