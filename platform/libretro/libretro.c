@@ -1022,7 +1022,40 @@ static void disk_init(void)
 
 static bool disk_set_eject_state(bool ejected)
 {
-   // TODO?
+	if(disk_ejected==ejected)return true;
+
+	if(ejected){
+		cdd_unload();
+	}
+	else{
+	   enum cd_track_type cd_type;
+	   int ret;
+
+	   if (disk_current_index >= sizeof(disks) / sizeof(disks[0]))
+	      return false;
+
+	   if (disks[disk_current_index].fname == NULL) {
+	      if (log_cb)
+	         log_cb(RETRO_LOG_ERROR, "missing disk #%u\n", disk_current_index);
+
+	      return false;
+	   }
+
+	   if (log_cb)
+	      log_cb(RETRO_LOG_INFO, "switching to disk %u: \"%s\"\n", disk_current_index,
+	            disks[disk_current_index].fname);
+
+	   ret = -1;
+	   cd_type = PicoCdCheck(disks[disk_current_index].fname, NULL);
+	   if (cd_type >= 0 && cd_type != CT_UNKNOWN)
+	      ret = cdd_load(disks[disk_current_index].fname, cd_type);
+	   if (ret != 0) {
+	      if (log_cb)
+	         log_cb(RETRO_LOG_ERROR, "Load failed, invalid CD image?\n");
+	      return false;
+	   }
+	}
+
    disk_ejected = ejected;
    return true;
 }
@@ -1039,36 +1072,6 @@ static unsigned int disk_get_image_index(void)
 
 static bool disk_set_image_index(unsigned int index)
 {
-   enum cd_track_type cd_type;
-   int ret;
-
-   if (index >= sizeof(disks) / sizeof(disks[0]))
-      return false;
-
-   if (disks[index].fname == NULL) {
-      if (log_cb)
-         log_cb(RETRO_LOG_ERROR, "missing disk #%u\n", index);
-
-      // RetroArch specifies "no disk" with index == count,
-      // so don't fail here..
-      disk_current_index = index;
-      return true;
-   }
-
-   if (log_cb)
-      log_cb(RETRO_LOG_INFO, "switching to disk %u: \"%s\"\n", index,
-            disks[index].fname);
-
-   ret = -1;
-   cd_type = PicoCdCheck(disks[index].fname, NULL);
-   if (cd_type >= 0 && cd_type != CT_UNKNOWN)
-      ret = cdd_load(disks[index].fname, cd_type);
-   if (ret != 0) {
-      if (log_cb)
-         log_cb(RETRO_LOG_ERROR, "Load failed, invalid CD image?\n");
-      return 0;
-   }
-
    disk_current_index = index;
    return true;
 }
